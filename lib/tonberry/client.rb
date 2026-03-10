@@ -42,9 +42,21 @@ module Tonberry
       cost = Cost.from_llm_response(response)
 
       res = []
-      response.content.each do |content|
-        case content
-        when Anthropic::Models::ToolUseBlock
+      tool_use_blocks = response.content.select { |c| c.is_a?(Anthropic::Models::ToolUseBlock) }
+      text_blocks = response.content.select { |c| c.is_a?(Anthropic::TextBlock) }
+
+      text_blocks.each do |content|
+        record_message(role: :assistant, content: content.text)
+        res << content.text
+      end
+
+      if tool_use_blocks.any?
+        assistant_content = tool_use_blocks.map do |content|
+          {type: "tool_use", id: content.id, name: content.name, input: content.input}
+        end
+        record_message(role: :assistant, content: assistant_content)
+
+        tool_results = tool_use_blocks.map do |content|
           tool_result = case content.name
                         when "read_file"
                           Tools::ReadFile::Tool.new.call(file_path: content.input[:file_path], content: "")
@@ -56,13 +68,20 @@ module Tonberry
                         else
                           "Unknown tool: #{content.name}"
                         end
-
-          record_message(role: :assistant, content: [{type: "tool_use", id: content.id, name: content.name, input: content.input}])
-          record_message(role: :user, content: [{type: "tool_result", tool_use_id: content.id, content: tool_result.to_s}])
           res << tool_result
-        when Anthropic::TextBlock
-          record_message(role: :assistant, content: content.text)
-          res << content.text
+          {type: "tool_result", tool_use_id: content.id, content: tool_result.to_s}
+        end
+        record_message(role: :user, content: tool_results)
+
+        follow_up = @anthropic.messages.create(
+          max_tokens: MAX_TOKENS, model: @model, messages: @messages, tools: tools
+        )
+        cost = cost + Cost.from_llm_response(follow_up)
+        follow_up.content.each do |content|
+          if content.is_a?(Anthropic::TextBlock)
+            record_message(role: :assistant, content: content.text)
+            res << content.text
+          end
         end
       end
 

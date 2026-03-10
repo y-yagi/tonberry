@@ -25,6 +25,14 @@ module Tonberry
       @output_tokens = output_tokens
     end
 
+    def +(other)
+      Cost.new(
+        model_id: @model_id,
+        input_tokens: @input_tokens + other.input_tokens,
+        output_tokens: @output_tokens + other.output_tokens
+      )
+    end
+
     def in_microcents
       input_cost_in_microcents + output_cost_in_microcents
     end
