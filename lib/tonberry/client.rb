@@ -48,17 +48,17 @@ module Tonberry
         tool_use_blocks = current_response.content.select { |c| c.is_a?(Anthropic::Models::ToolUseBlock) }
         text_blocks = current_response.content.select { |c| c.is_a?(Anthropic::TextBlock) }
 
+        assistant_content = []
         text_blocks.each do |content|
-          record_message(role: :assistant, content: content.text)
+          assistant_content << {type: "text", text: content.text}
           res << content.text
         end
-
-        break if tool_use_blocks.empty?
-
-        assistant_content = tool_use_blocks.map do |content|
-          {type: "tool_use", id: content.id, name: content.name, input: content.input}
+        tool_use_blocks.each do |content|
+          assistant_content << {type: "tool_use", id: content.id, name: content.name, input: content.input}
         end
         record_message(role: :assistant, content: assistant_content)
+
+        break if tool_use_blocks.empty?
 
         tool_results = tool_use_blocks.map do |content|
           tool_result = case content.name
@@ -118,6 +118,14 @@ module Tonberry
         break if @messages.size < 4
 
         @messages.shift(2)
+
+        # Keep removing pairs until the first user message isn't an orphaned tool_result
+        while @messages.size >= 2 &&
+              @messages.first[:role] == :user &&
+              @messages.first[:content].is_a?(Array) &&
+              @messages.first[:content].any? { |c| c[:type] == "tool_result" }
+          @messages.shift(2)
+        end
       end
     end
   end
