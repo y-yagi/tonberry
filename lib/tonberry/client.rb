@@ -42,15 +42,19 @@ module Tonberry
       cost = Cost.from_llm_response(response)
 
       res = []
-      tool_use_blocks = response.content.select { |c| c.is_a?(Anthropic::Models::ToolUseBlock) }
-      text_blocks = response.content.select { |c| c.is_a?(Anthropic::TextBlock) }
+      current_response = response
 
-      text_blocks.each do |content|
-        record_message(role: :assistant, content: content.text)
-        res << content.text
-      end
+      loop do
+        tool_use_blocks = current_response.content.select { |c| c.is_a?(Anthropic::Models::ToolUseBlock) }
+        text_blocks = current_response.content.select { |c| c.is_a?(Anthropic::TextBlock) }
 
-      if tool_use_blocks.any?
+        text_blocks.each do |content|
+          record_message(role: :assistant, content: content.text)
+          res << content.text
+        end
+
+        break if tool_use_blocks.empty?
+
         assistant_content = tool_use_blocks.map do |content|
           {type: "tool_use", id: content.id, name: content.name, input: content.input}
         end
@@ -73,16 +77,10 @@ module Tonberry
         end
         record_message(role: :user, content: tool_results)
 
-        follow_up = @anthropic.messages.create(
+        current_response = @anthropic.messages.create(
           max_tokens: MAX_TOKENS, model: @model, messages: @messages, tools: tools
         )
-        cost = cost + Cost.from_llm_response(follow_up)
-        follow_up.content.each do |content|
-          if content.is_a?(Anthropic::TextBlock)
-            record_message(role: :assistant, content: content.text)
-            res << content.text
-          end
-        end
+        cost = cost + Cost.from_llm_response(current_response)
       end
 
       total_dollars = Money.wrap(cost.in_microcents).in_dollars
