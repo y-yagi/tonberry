@@ -19,8 +19,27 @@ module Tonberry
           # Do nothing
         else
           begin
-            $stdout.puts Rainbow(client.chat(line)).bright.green
+            result = nil
+            spinner_thread = Thread.new do
+              spinner_chars = %w[⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏]
+              i = 0
+              while result.nil?
+                $stdout.print Rainbow("\r#{spinner_chars[i % spinner_chars.size]} Processing...").green
+                $stdout.flush
+                sleep 0.5
+                i += 1
+              end
+              $stdout.print "\r\e[K"
+              $stdout.flush
+            end
+
+            result = client.chat(line)
+            spinner_thread.join
+
+            $stdout.puts Rainbow(result).bright.green
           rescue CostLimitExceededError => e
+            result = :error
+            spinner_thread&.join
             $stdout.puts Rainbow(e.message).bright.red
           end
         end
