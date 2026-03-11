@@ -106,7 +106,7 @@ module Tonberry
 
     def record_message(role:, content:)
       @messages << {role:, content:}
-      trim_history_if_needed
+#      trim_history_if_needed
     end
 
     def trim_history_if_needed
