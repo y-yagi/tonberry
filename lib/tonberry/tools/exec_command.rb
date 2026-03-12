@@ -22,7 +22,12 @@ module Tonberry
             return "Error: '#{executable}' is not allowed. Only the following commands are allowed: #{ALLOWED_COMMANDS.join(", ")}"
           end
 
-          output, _ = Open3.capture2e(command)
+          args = command.split[1..]
+          if args.any? { |arg| arg.start_with?("/") || arg.include?("..") }
+            return "Error: Paths outside the current directory are not allowed."
+          end
+
+          output, _ = Open3.capture2e(command, chdir: Dir.pwd)
           output
         end
       end
