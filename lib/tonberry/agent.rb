@@ -33,12 +33,20 @@ module Tonberry
 
     def chat_with_spinner(line)
       result = nil
-      spinner_thread = start_spinner { result }
+      mutex = Mutex.new
+      spinner_thread = start_spinner(mutex) { result }
 
       begin
-        result = @client.chat(line)
+        cost_info = @client.chat(line) do |output|
+          mutex.synchronize do
+            $stdout.print "\r\e[K"
+            $stdout.puts Rainbow(output.to_s).bright.green
+            $stdout.flush
+          end
+        end
+        result = :done
         spinner_thread.join
-        $stdout.puts Rainbow(result).bright.green
+        $stdout.puts Rainbow(cost_info).bright.green
       rescue CostLimitExceededError => e
         result = :error
         spinner_thread.join
@@ -46,13 +54,15 @@ module Tonberry
       end
     end
 
-    def start_spinner(&result_check)
+    def start_spinner(mutex, &result_check)
       Thread.new do
         spinner_chars = %w[⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏]
         i = 0
         while result_check.call.nil?
-          $stdout.print Rainbow("\r#{spinner_chars[i % spinner_chars.size]} Processing...").green
-          $stdout.flush
+          mutex.synchronize do
+            $stdout.print Rainbow("\r#{spinner_chars[i % spinner_chars.size]} Processing...").green
+            $stdout.flush
+          end
           sleep 0.5
           i += 1
         end

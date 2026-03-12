@@ -40,8 +40,6 @@ module Tonberry
       )
 
       cost = Cost.from_llm_response(response)
-
-      res = []
       current_response = response
 
       loop do
@@ -51,7 +49,7 @@ module Tonberry
         assistant_content = []
         text_blocks.each do |content|
           assistant_content << {type: "text", text: content.text}
-          res << content.text
+          yield content.text if block_given?
         end
         tool_use_blocks.each do |content|
           assistant_content << {type: "tool_use", id: content.id, name: content.name, input: content.input}
@@ -72,7 +70,7 @@ module Tonberry
                         else
                           "Unknown tool: #{content.name}"
                         end
-          res << tool_result
+          yield tool_result if block_given?
           {type: "tool_result", tool_use_id: content.id, content: tool_result.to_s}
         end
         record_message(role: :user, content: tool_results)
@@ -86,8 +84,7 @@ module Tonberry
       total_dollars = Money.wrap(cost.in_microcents).in_dollars
       input_dollars = Money.wrap(cost.input_cost_in_microcents).in_dollars
       output_dollars = Money.wrap(cost.output_cost_in_microcents).in_dollars
-      res << "[Cost: $#{total_dollars} (input: #{cost.input_tokens} tokens / $#{input_dollars}, output: #{cost.output_tokens} tokens / $#{output_dollars})]"
-      res.join("\n")
+      "[Cost: $#{total_dollars} (input: #{cost.input_tokens} tokens / $#{input_dollars}, output: #{cost.output_tokens} tokens / $#{output_dollars})]"
     end
 
     private
