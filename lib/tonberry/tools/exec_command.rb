@@ -5,10 +5,10 @@ require "open3"
 module Tonberry
   module Tools
     module ExecCommand
-      ALLOWED_COMMANDS = %w[git ls mv rm].freeze
+      ALLOWED_COMMANDS = %w[git ls mv rm gh].freeze
 
       class InputSchema < Anthropic::BaseModel
-        required :command, String, doc: "The command to run (only 'git', 'ls', 'mv' and 'rm' are allowed)"
+        required :command, String, doc: "The command to run (only 'git', 'ls', 'mv', 'rm' and 'gh' are allowed)"
 
         doc "Run the given command in local"
       end
