@@ -5,6 +5,7 @@ require "base64"
 require_relative "tools/exec_command"
 require_relative "tools/write_file"
 require_relative "tools/read_file"
+require_relative "tools/list_files"
 require_relative "cost"
 
 module Tonberry
@@ -25,6 +26,7 @@ module Tonberry
         {name: "exec_command", input_schema: Tools::ExecCommand::InputSchema},
         {name: "write_file", input_schema: Tools::WriteFile::InputSchema},
         {name: "read_file", input_schema: Tools::ReadFile::InputSchema},
+        {name: "list_files", input_schema: Tools::ListFiles::InputSchema},
       ]
 
       check_cost_limit!(tools) if @cost_limit_in_microcents
@@ -61,6 +63,8 @@ module Tonberry
                           "Write a file to #{content.input[:file_path]}"
                         when "exec_command"
                           Tools::ExecCommand::Tool.new.call(command: content.input[:command])
+                        when "list_files"
+                          Tools::ListFiles::Tool.new.call(path: content.input[:path])
                         else
                           "Unknown tool: #{content.name}"
                         end
