@@ -8,12 +8,6 @@ require_relative "tools/read_file"
 require_relative "cost"
 
 module Tonberry
-  class CostLimitExceededError < StandardError
-    def initialize(estimated_dollars, limit_dollars)
-      super("Estimated input cost $#{estimated_dollars} exceeds limit $#{limit_dollars}")
-    end
-  end
-
   class Client
     MAX_TOKENS = 1024
     MAX_INPUT_TOKENS = 20_000
