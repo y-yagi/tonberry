@@ -5,7 +5,7 @@ require_relative "client"
 module Tonberry
   class Agent
     def initialize(args)
-      @client = Tonberry::Client.new(cost_limit_in_dollars: 0.1)
+      @client = Tonberry::Client.new(cost_limit_in_dollars: 0.1, model: ENV["TONBERRY_MODEL"]&.to_sym)
     end
 
     def run
