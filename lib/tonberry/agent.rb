@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 require_relative "client"
+require_relative "skill_loader"
 
 module Tonberry
   class Agent
     def initialize(args)
       @client = Tonberry::Client.new(cost_limit_in_dollars: 0.1, model: ENV["TONBERRY_MODEL"]&.to_sym)
+      @skill_loader = SkillLoader.new
     end
 
     def run
@@ -26,8 +28,37 @@ module Tonberry
         exit_gracefully
       when ""
         # Do nothing
+      when /\A\/(\S+)(.*)\z/
+        handle_skill($1, $2.strip)
       else
         chat_with_spinner(line)
+      end
+    end
+
+    def handle_skill(name, args)
+      if name == "skills"
+        list_skills
+        return
+      end
+
+      prompt = @skill_loader.load(name, args)
+      chat_with_spinner(prompt)
+    rescue UnknownSkillError => e
+      $stdout.puts Rainbow(e.message).bright.red
+    end
+
+    def list_skills
+      skills = @skill_loader.list
+      if skills.empty?
+        $stdout.puts Rainbow("No skills available.").bright.yellow
+        return
+      end
+
+      $stdout.puts Rainbow("Available skills:").bright.green
+      skills.each do |skill|
+        line = Rainbow("  /#{skill[:name]}").bright.green
+        line += Rainbow(" - #{skill[:description]}").green unless skill[:description].empty?
+        $stdout.puts line
       end
     end
 
