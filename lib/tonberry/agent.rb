@@ -5,9 +5,9 @@ require_relative "skill_loader"
 
 module Tonberry
   class Agent
-    def initialize(args)
+    def initialize(options = {})
       @client = Tonberry::Client.new(cost_limit_in_dollars: 0.1, model: ENV["TONBERRY_MODEL"]&.to_sym)
-      @skill_loader = SkillLoader.new
+      @skill_loader = SkillLoader.new(extra_dirs: options[:skills_dirs])
     end
 
     def run

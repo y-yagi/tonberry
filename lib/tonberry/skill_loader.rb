@@ -2,10 +2,20 @@
 
 module Tonberry
   class SkillLoader
-    SKILL_DIRS = [
+    DEFAULT_SKILL_DIRS = [
       File.expand_path("~/.config/tonberry/skills"),
       File.join(__dir__, "../../skills")
     ].freeze
+
+    def initialize(extra_dirs: nil)
+      @skill_dirs = DEFAULT_SKILL_DIRS.dup
+      Array(extra_dirs).each do |dir|
+        expanded = File.expand_path(dir)
+        raise ArgumentError, "Skills directory not found: #{expanded}" unless Dir.exist?(expanded)
+
+        @skill_dirs.unshift(expanded)
+      end
+    end
 
     def load(name, args = "")
       file = find_skill_file(name)
@@ -16,7 +26,7 @@ module Tonberry
     end
 
     def list
-      SKILL_DIRS.each_with_object([]) do |dir, skills|
+      @skill_dirs.each_with_object([]) do |dir, skills|
         next unless Dir.exist?(dir)
 
         Dir.glob("#{dir}/*.md").each do |file|
@@ -30,7 +40,7 @@ module Tonberry
     private
 
     def find_skill_file(name)
-      SKILL_DIRS.map { |d| "#{d}/#{name}.md" }.find { |f| File.exist?(f) }
+      @skill_dirs.map { |d| "#{d}/#{name}.md" }.find { |f| File.exist?(f) }
     end
 
     def strip_frontmatter(content)
