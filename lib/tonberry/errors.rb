@@ -12,4 +12,10 @@ module Tonberry
       super("Unknown skill: #{name}")
     end
   end
+
+  class UnknownSessionError < StandardError
+    def initialize(name)
+      super("Unknown session: #{name}")
+    end
+  end
 end

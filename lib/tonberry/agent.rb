@@ -2,12 +2,14 @@
 
 require_relative "client"
 require_relative "skill_loader"
+require_relative "session_manager"
 
 module Tonberry
   class Agent
     def initialize(options = {})
       @client = Tonberry::Client.new(cost_limit_in_dollars: 0.1, model: ENV["TONBERRY_MODEL"]&.to_sym)
       @skill_loader = SkillLoader.new(extra_dirs: options[:skills_dirs])
+      @session_manager = SessionManager.new
     end
 
     def run
@@ -36,14 +38,20 @@ module Tonberry
     end
 
     def handle_skill(name, args)
-      if name == "skills"
+      case name
+      when "skills"
         list_skills
-        return
+      when "save"
+        save_session(args)
+      when "load"
+        load_session(args)
+      when "sessions"
+        list_sessions
+      else
+        prompt = @skill_loader.load(name, args)
+        chat_with_spinner(prompt)
       end
-
-      prompt = @skill_loader.load(name, args)
-      chat_with_spinner(prompt)
-    rescue UnknownSkillError => e
+    rescue UnknownSkillError, UnknownSessionError => e
       $stdout.puts Rainbow(e.message).bright.red
     end
 
@@ -99,6 +107,34 @@ module Tonberry
         end
         $stdout.print "\r\e[K"
         $stdout.flush
+      end
+    end
+
+    def save_session(name)
+      saved_name = @session_manager.save(@client.messages, name: name.empty? ? nil : name)
+      $stdout.puts Rainbow("Session saved: #{saved_name}").bright.green
+    end
+
+    def load_session(name)
+      if name.empty?
+        $stdout.puts Rainbow("Usage: /load <session_name>").bright.yellow
+        return
+      end
+      messages = @session_manager.load(name)
+      @client.load_messages(messages)
+      $stdout.puts Rainbow("Session loaded: #{name} (#{messages.size / 2} exchanges)").bright.green
+    end
+
+    def list_sessions
+      sessions = @session_manager.list
+      if sessions.empty?
+        $stdout.puts Rainbow("No sessions saved.").bright.yellow
+        return
+      end
+
+      $stdout.puts Rainbow("Saved sessions:").bright.green
+      sessions.each do |session|
+        $stdout.puts Rainbow("  #{session[:name]}").bright.green + Rainbow(" - #{session[:saved_at]}").green
       end
     end
 

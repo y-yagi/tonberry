@@ -13,11 +13,17 @@ module Tonberry
     MAX_TOKENS = 1024
     MAX_INPUT_TOKENS = 20_000
 
+    attr_reader :messages
+
     def initialize(cost_limit_in_dollars: nil, model: nil)
       @anthropic = Anthropic::Client.new
       @model = model || :"claude-sonnet-4-6"
       @messages = []
       @cost_limit_in_microcents = cost_limit_in_dollars ? Money.wrap(cost_limit_in_dollars.to_d).in_microcents : nil
+    end
+
+    def load_messages(messages)
+      @messages = messages
     end
 
     def chat(content)
