@@ -18,4 +18,10 @@ module Tonberry
       super("Unknown session: #{name}")
     end
   end
+
+  class UnknownMemoryError < StandardError
+    def initialize(name)
+      super("Unknown memory: #{name}")
+    end
+  end
 end

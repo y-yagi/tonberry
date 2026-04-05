@@ -3,6 +3,7 @@
 require_relative "client"
 require_relative "skill_loader"
 require_relative "session_manager"
+require_relative "memory_manager"
 
 module Tonberry
   class Agent
@@ -10,6 +11,7 @@ module Tonberry
       @client = Tonberry::Client.new(cost_limit_in_dollars: 0.1, model: ENV["TONBERRY_MODEL"]&.to_sym)
       @skill_loader = SkillLoader.new(extra_dirs: options[:skills_dirs])
       @session_manager = SessionManager.new
+      @memory_manager = MemoryManager.new
     end
 
     def run
@@ -47,11 +49,17 @@ module Tonberry
         load_session(args)
       when "sessions"
         list_sessions
+      when "remember"
+        add_memory(args)
+      when "memories"
+        list_memories
+      when "forget"
+        forget_memory(args)
       else
         prompt = @skill_loader.load(name, args)
         chat_with_spinner(prompt)
       end
-    rescue UnknownSkillError, UnknownSessionError => e
+    rescue UnknownSkillError, UnknownSessionError, UnknownMemoryError => e
       $stdout.puts Rainbow(e.message).bright.red
     end
 
@@ -76,7 +84,8 @@ module Tonberry
       spinner_thread = start_spinner(mutex) { result }
 
       begin
-        cost_info = @client.chat(line) do |output|
+        system_prompt = @memory_manager.to_system_prompt
+        cost_info = @client.chat(line, system: system_prompt) do |output|
           mutex.synchronize do
             $stdout.print "\r\e[K"
             $stdout.puts Rainbow(output.to_s).bright.green
@@ -136,6 +145,37 @@ module Tonberry
       sessions.each do |session|
         $stdout.puts Rainbow("  #{session[:name]}").bright.green + Rainbow(" - #{session[:saved_at]}").green
       end
+    end
+
+    def add_memory(content)
+      if content.empty?
+        $stdout.puts Rainbow("Usage: /remember <text>").bright.yellow
+        return
+      end
+      name = @memory_manager.remember(content)
+      $stdout.puts Rainbow("Memory saved: #{name}").bright.green
+    end
+
+    def list_memories
+      memories = @memory_manager.list
+      if memories.empty?
+        $stdout.puts Rainbow("No memories saved.").bright.yellow
+        return
+      end
+
+      $stdout.puts Rainbow("Saved memories:").bright.green
+      memories.each do |memory|
+        $stdout.puts Rainbow("  [#{memory["name"]}]").bright.green + Rainbow(" #{memory["content"]}").green
+      end
+    end
+
+    def forget_memory(name)
+      if name.empty?
+        $stdout.puts Rainbow("Usage: /forget <memory_name>").bright.yellow
+        return
+      end
+      @memory_manager.forget(name)
+      $stdout.puts Rainbow("Memory deleted: #{name}").bright.green
     end
 
     def exit_gracefully

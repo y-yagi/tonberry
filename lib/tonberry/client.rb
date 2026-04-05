@@ -26,7 +26,7 @@ module Tonberry
       @messages = messages
     end
 
-    def chat(content)
+    def chat(content, system: nil)
       record_message(role: :user, content:)
       tools = [
         {name: "exec_command", input_schema: Tools::ExecCommand::InputSchema},
@@ -35,11 +35,11 @@ module Tonberry
         {name: "list_files", input_schema: Tools::ListFiles::InputSchema},
       ]
 
-      check_cost_limit!(tools) if @cost_limit_in_microcents
+      check_cost_limit!(tools, system:) if @cost_limit_in_microcents
 
-      response = @anthropic.messages.create(
-        max_tokens: MAX_TOKENS, model: @model, messages: @messages, tools: tools
-      )
+      params = {max_tokens: MAX_TOKENS, model: @model, messages: @messages, tools: tools}
+      params[:system] = system if system
+      response = @anthropic.messages.create(**params)
 
       cost = Cost.from_llm_response(response)
       current_response = response
@@ -79,9 +79,7 @@ module Tonberry
         end
         record_message(role: :user, content: tool_results)
 
-        current_response = @anthropic.messages.create(
-          max_tokens: MAX_TOKENS, model: @model, messages: @messages, tools: tools
-        )
+        current_response = @anthropic.messages.create(**params.merge(messages: @messages))
         cost = cost + Cost.from_llm_response(current_response)
       end
 
@@ -93,10 +91,10 @@ module Tonberry
 
     private
 
-    def check_cost_limit!(tools)
-      token_count = @anthropic.messages.count_tokens(
-        model: @model, messages: @messages, tools: tools
-      )
+    def check_cost_limit!(tools, system: nil)
+      params = {model: @model, messages: @messages, tools: tools}
+      params[:system] = system if system
+      token_count = @anthropic.messages.count_tokens(**params)
       estimated_cost = Cost.new(model_id: @model, input_tokens: token_count.input_tokens, output_tokens: 0)
       if estimated_cost.input_cost_in_microcents > @cost_limit_in_microcents
         limit_dollars = Money.wrap(@cost_limit_in_microcents).in_dollars
